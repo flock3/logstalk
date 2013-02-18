@@ -1,0 +1,13 @@
+** Alert This is the date and other-things domething,else
+This is the first log line of the file signature 13 # something
+This is the second and full log line
+
+of t
+
+the file
+
+** Alert This is the other thing
+Second line
+Third line
+fourth line
+
