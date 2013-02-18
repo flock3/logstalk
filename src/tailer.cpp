@@ -1,72 +1,119 @@
-//============================================================================
-// Name        : tailer.cpp
-// Author      : Thomas Gray
-// Version     :
-// Copyright   : GNU/GPL
-// Description : Hello World in C++, Ansi-style
-//============================================================================
-/*This is the sample program to notify us for the file creation and file deletion takes place in “/tmp” directory*/
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
 #include <sys/types.h>
-#include <inotifytools/inotify.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <sys/inotify.h>
 
-#define EVENT_SIZE  ( sizeof (struct inotify_event) )
-#define EVENT_BUF_LEN     ( 1024 * ( EVENT_SIZE + 16 ) )
+void get_event (int fd, const char * target);
+void handle_error (int error);
 
-int main( )
+/* ----------------------------------------------------------------- */
+
+int main (int argc, char *argv[])
 {
-  int length, i = 0;
-  int fd;
-  int wd;
-  char buffer[EVENT_BUF_LEN];
+   char target[FILENAME_MAX];
+   int result;
+   int fd;
+   int wd;   /* watch descriptor */
 
-  /*creating the INOTIFY instance*/
-  fd = inotify_init();
+   if (argc < 2) {
+      fprintf (stderr, "Watching the current directory\n");
+      strcpy (target, ".");
+   }
+   else {
+      fprintf (stderr, "Watching %s\n", argv[1]);
+      strcpy (target, argv[1]);
+   }
 
-  /*checking for error*/
-  if ( fd < 0 ) {
-    perror( "inotify_init" );
-  }
+   fd = inotify_init();
+   if (fd < 0) {
+      handle_error (errno);
+      return 1;
+   }
 
-  /*adding the “/tmp” directory into watch list. Here, the suggestion is to validate the existence of the directory before adding into monitoring list.*/
-  wd = inotify_add_watch( fd, "/tmp", IN_CREATE | IN_DELETE );
+   wd = inotify_add_watch (fd, target, IN_ALL_EVENTS);
+   if (wd < 0) {
+      handle_error (errno);
+      return 1;
+   }
 
-  /*read to determine the event change happens on “/tmp” directory. Actually this read blocks until the change event occurs*/
+   while (1) {
+      get_event(fd, target);
+   }
 
-  length = read( fd, buffer, EVENT_BUF_LEN );
-
-  /*checking for error*/
-  if ( length < 0 ) {
-    perror( "read" );
-  }
-
-  /*actually read return the list of change events happens. Here, read the change event one by one and process it accordingly.*/
-  while ( i < length ) {     struct inotify_event *event = ( struct inotify_event * ) &buffer[ i ];     if ( event->len ) {
-      if ( event->mask & IN_CREATE ) {
-        if ( event->mask & IN_ISDIR ) {
-          printf( "New directory %s created.\n", event->name );
-        }
-        else {
-          printf( "New file %s created.\n", event->name );
-        }
-      }
-      else if ( event->mask & IN_DELETE ) {
-        if ( event->mask & IN_ISDIR ) {
-          printf( "Directory %s deleted.\n", event->name );
-        }
-        else {
-          printf( "File %s deleted.\n", event->name );
-        }
-      }
-    }
-    i += EVENT_SIZE + event->len;
-  }
-  /*removing the “/tmp” directory from the watch list.*/
-   inotify_rm_watch( fd, wd );
-
-  /*closing the INOTIFY instance*/
-   close( fd );
-
+   return 0;
 }
+
+/* ----------------------------------------------------------------- */
+/* Allow for 1024 simultanious events */
+#define BUFF_SIZE ((sizeof(struct inotify_event)+FILENAME_MAX)*1024)
+
+void get_event (int fd, const char * target)
+{
+   ssize_t len, i = 0;
+   char action[81+FILENAME_MAX] = {0};
+   char buff[BUFF_SIZE] = {0};
+
+   len = read (fd, buff, BUFF_SIZE);
+
+   while (i < len) {
+      struct inotify_event *pevent = (struct inotify_event *)&buff[i];
+      char action[81+FILENAME_MAX] = {0};
+
+      if (pevent->len)
+         strcpy (action, pevent->name);
+      else
+         strcpy (action, target);
+
+      if (pevent->mask & IN_ACCESS)
+         strcat(action, " was read");
+      if (pevent->mask & IN_ATTRIB)
+         strcat(action, " Metadata changed");
+      if (pevent->mask & IN_CLOSE_WRITE)
+         strcat(action, " opened for writing was closed");
+      if (pevent->mask & IN_CLOSE_NOWRITE)
+         strcat(action, " not opened for writing was closed");
+      if (pevent->mask & IN_CREATE)
+         strcat(action, " created in watched directory");
+      if (pevent->mask & IN_DELETE)
+         strcat(action, " deleted from watched directory");
+      if (pevent->mask & IN_DELETE_SELF)
+         strcat(action, "Watched file/directory was itself deleted");
+      if (pevent->mask & IN_MODIFY)
+         strcat(action, " was modified");
+      if (pevent->mask & IN_MOVE_SELF)
+         strcat(action, "Watched file/directory was itself moved");
+      if (pevent->mask & IN_MOVED_FROM)
+         strcat(action, " moved out of watched directory");
+      if (pevent->mask & IN_MOVED_TO)
+         strcat(action, " moved into watched directory");
+      if (pevent->mask & IN_OPEN)
+         strcat(action, " was opened");
+
+   /*
+      printf ("wd=%d mask=%d cookie=%d len=%d dir=%s\n",
+              pevent->wd, pevent->mask, pevent->cookie, pevent->len,
+              (pevent->mask & IN_ISDIR)?"yes":"no");
+
+      if (pevent->len) printf ("name=%s\n", pevent->name);
+   */
+
+      printf ("%s\n", action);
+
+      i += sizeof(struct inotify_event) + pevent->len;
+
+   }
+
+}  /* get_event */
+
+/* ----------------------------------------------------------------- */
+
+void handle_error (int error)
+{
+   fprintf (stderr, "Error: %s\n", strerror(error));
+
+}  /* handle_error */
+
+/* ----------------------------------------------------------------- */
