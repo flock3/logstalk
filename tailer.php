@@ -87,8 +87,18 @@ while(true)
         echo "\tPutting the current " . count($alerts) . ' into beanstalk.' . PHP_EOL;
         $alertChunks = array_chunk($alerts, 10);
 
+        $completedChunks = array();
+
         foreach($alertChunks as $chunk)
-            $pheanstalk->put(base64_encode(gzcompress(json_encode($chunk))));
+        {
+            $encoded = base64_encode(gzcompress(json_encode($chunk)));
+
+            if(strlen($encoded) > 65535)
+            {
+
+            }
+        }
+
 
         unset($alerts);
     }

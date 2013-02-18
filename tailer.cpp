@@ -5,7 +5,6 @@
 #include <beanstalk.hpp>
 
 
-
 using namespace std;
 using namespace Beanstalk;
 
@@ -45,9 +44,9 @@ int main ()
 
 	Client beanstalkClient("127.0.0.1", 11300);
 
-//	beanstalkClient.use("raw-alerts");
+	beanstalkClient.use("raw-alerts");
 
-	ifstream file ("file.txt", ios::in|ios::ate);
+	ifstream file ("/var/ossec/logs/alerts/alerts.log", ios::in|ios::ate);
 
 	if (!file.is_open())
 	{
@@ -121,17 +120,14 @@ int main ()
 
 			alertPositions.push_back(alertStartingPos);
 
-			cout << "I have found the alert string at position " << alertStartingPos << " within the string. Fuck YEAH!" << endl;
 		}
 
 		int endingIterator = alertPositions.size();
-
+		int jobsWritten = 0;
 		int lastAlertOccurance = -1;
 
 		for (int iterator = 0; iterator < endingIterator; ++iterator)
 		{
-			cout << "Processing iteration:" << iterator << endl;
-
 			if(-1 == lastAlertOccurance)
 			{
 				lastAlertOccurance = alertPositions[iterator];
@@ -151,9 +147,10 @@ int main ()
 
 
 			beanstalkClient.put(alertBlock, 0, 0, 0);
-
-			cout << "BLOCK:\n\n\n" << alertBlock << "BOOM mother fucker." << endl;
+			++jobsWritten;
 		}
+
+		cout << "Wrote " << jobsWritten << " jobs to beanstalkd.." << endl;
 	}
 
   return 0;
