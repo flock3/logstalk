@@ -2,11 +2,9 @@
 #include <fstream>
 #include <time.h>
 #include <vector>
-#include <beanstalk.hpp>
 
 
 using namespace std;
-using namespace Beanstalk;
 
 ifstream::pos_type size;
 char * memblock;
@@ -41,11 +39,6 @@ int startingPos(char * memblock, int currentPosition)
  */
 int main ()
 {
-
-	Client beanstalkClient("127.0.0.1", 11300);
-
-	beanstalkClient.use("raw-alerts");
-
 	ifstream file ("/var/ossec/logs/alerts/alerts.log", ios::in|ios::ate);
 
 	if (!file.is_open())
@@ -146,11 +139,11 @@ int main ()
 			}
 
 
-			beanstalkClient.put(alertBlock, 0, 0, 0);
 			++jobsWritten;
 		}
 
 		cout << "Wrote " << jobsWritten << " jobs to beanstalkd.." << endl;
+		delete[] memblock;
 	}
 
   return 0;
